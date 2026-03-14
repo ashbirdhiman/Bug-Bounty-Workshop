@@ -38,6 +38,9 @@ def upload_view(request):
             except Exception:
                 pass
 
+            if dot_spacing < 1:
+                dot_spacing = 10
+
             apply_halftone(original_path, output_path, dot_spacing=dot_spacing, style=style)
 
             upload.processed = f"processed/{filename}"
@@ -171,6 +174,7 @@ def batch_upload_view(request):
                         is_public=make_public,
                     )
                     upload.save()
+                    created_count += 1
                 except Exception:
                     continue  # Skip invalid files silently
 
