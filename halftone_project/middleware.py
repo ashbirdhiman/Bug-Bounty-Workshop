@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import HttpResponse
+from django.urls import Resolver404, resolve
 from django.utils import timezone
 from datetime import timedelta
 
@@ -33,11 +34,14 @@ class RateLimitMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if (
-            request.method == "POST"
-            and request.user.is_authenticated
-            and request.path == "/"
-        ):
+        is_upload_post = request.method == "POST" and request.user.is_authenticated
+        if is_upload_post:
+            try:
+                is_upload_post = resolve(request.path_info).url_name == "upload"
+            except Resolver404:
+                is_upload_post = False
+
+        if is_upload_post:
             window = timezone.now() - timedelta(
                 minutes=getattr(settings, "RATE_LIMIT_WINDOW", 5)
             )
@@ -46,7 +50,7 @@ class RateLimitMiddleware:
                 user=request.user,
                 path="/",
                 method="POST",
-                timestamp__lte=window,
+                timestamp__gte=window,
             ).count()
 
             max_uploads = getattr(settings, "RATE_LIMIT_UPLOADS", 10)

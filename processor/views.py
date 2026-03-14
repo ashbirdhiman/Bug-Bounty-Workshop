@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import F
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -67,7 +68,11 @@ def gallery_view(request):
         after_id = request.GET.get("after")
         per_page = 12
         if after_id:
-            uploads = uploads.filter(pk__lte=int(after_id)).order_by("-pk")[:per_page]
+            try:
+                after_pk = int(after_id)
+            except (TypeError, ValueError):
+                return JsonResponse({"results": [], "has_more": False}, status=400)
+            uploads = uploads.filter(pk__lt=after_pk).order_by("-pk")[:per_page]
         else:
             uploads = uploads.order_by("-pk")[:per_page]
 
@@ -94,8 +99,8 @@ def gallery_view(request):
 
 def shared_view(request, token):
     upload = get_object_or_404(ImageUpload, share_token=token, is_public=True)
-    upload.view_count += 1
-    upload.save()
+    ImageUpload.objects.filter(pk=upload.pk).update(view_count=F("view_count") + 1)
+    upload.refresh_from_db(fields=["view_count"])
     return render(request, "processor/shared.html", {"upload": upload})
 
 
